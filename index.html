@@ -2,35 +2,140 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>link.photos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Галерея Саши Линченко</title>
+  <meta name="description" content="Что в галерее у Саши Линченко">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://picsum.photos">
+  <link rel="preconnect" href="https://fastly.picsum.photos">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #0a0a0a;
+      --tile: #d9d9d9;
+      --muted: #9a9a9a;
+      --pill: rgba(255, 255, 255, 0.86);
+      --ui-bg: rgba(255, 255, 255, 0.86);
+      --ui-border: rgba(0, 0, 0, 0.1);
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b0b0b;
+        --fg: #f3f3f3;
+        --tile: #232323;
+        --muted: #767676;
+        --pill: rgba(11, 11, 11, 0.82);
+        --ui-bg: rgba(30, 30, 30, 0.86);
+        --ui-border: rgba(255, 255, 255, 0.12);
+      }
+    }
     html, body {
       margin: 0;
       height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
-    body {
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: zoom-in;
+    }
+    canvas.max { cursor: grab; }
+    canvas.dragging { cursor: grabbing; }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+    .controls {
+      position: fixed;
+      right: max(16px, env(safe-area-inset-right));
+      bottom: max(16px, env(safe-area-inset-bottom));
       display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: #fafafa;
-      color: #111;
+      gap: 8px;
     }
-    h1 {
-      font-size: clamp(3rem, 12vw, 8rem);
-      font-weight: 700;
-      margin: 0;
+    .controls button {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid var(--ui-border);
+      background: var(--ui-bg);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      color: var(--fg);
+      font: 500 22px/1 Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      cursor: pointer;
     }
-    @media (prefers-color-scheme: dark) {
-      body {
-        background: #111;
-        color: #fafafa;
+    .controls button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+    .hint {
+      position: fixed;
+      left: max(16px, env(safe-area-inset-left));
+      bottom: max(16px, env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      max-width: calc(100% - 32px - 160px);
+      padding: 12px 16px;
+      border-radius: 22px;
+      border: 1px solid var(--ui-border);
+      background: var(--ui-bg);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      font-size: 14px;
+      line-height: 1.3;
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+    .hint.hidden { opacity: 0; }
+    @media (max-width: 600px) {
+      .hint {
+        bottom: calc(max(16px, env(safe-area-inset-bottom)) + 56px);
+        max-width: calc(100% - 32px);
       }
+    }
+    .hint .touch { display: none; }
+    @media (hover: none) {
+      .hint .mouse { display: none; }
+      .hint .touch { display: inline; }
     }
   </style>
 </head>
 <body>
-  <h1>Привет</h1>
+  <h1 class="visually-hidden">Что в галерее у Саши Линченко</h1>
+  <canvas id="gallery" role="img" aria-label="Галерея фотографий по группам. Колёсиком или щипком можно приблизить."></canvas>
+  <div class="hint" id="hint">
+    <span class="mouse">Крутите колёсико, чтобы приблизить, тяните — чтобы двигать</span>
+    <span class="touch">Коснитесь или разведите пальцы, чтобы приблизить</span>
+  </div>
+  <div class="controls">
+    <button id="reset" type="button" aria-label="Вся галерея" title="Вся галерея (0)">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
+        <rect x="1" y="1" width="7" height="7"/><rect x="10" y="1" width="7" height="7"/>
+        <rect x="1" y="10" width="7" height="7"/><rect x="10" y="10" width="7" height="7"/>
+      </svg>
+    </button>
+    <button id="zoomOut" type="button" aria-label="Отдалить" title="Отдалить (−)">−</button>
+    <button id="zoomIn" type="button" aria-label="Приблизить" title="Приблизить (+)">+</button>
+  </div>
+  <noscript>Чтобы посмотреть галерею, включите JavaScript.</noscript>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
